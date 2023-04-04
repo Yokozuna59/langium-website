@@ -88,7 +88,6 @@ export class LangiumAST {
 
     /**
     * Takes a string corresponding to a serialized Langium AST, and returns a deserialized AST node
-    * 
     * @param content String to parse & deserialize
     * @returns A Langium AST with cross-refs restored
     */
@@ -100,9 +99,9 @@ export class LangiumAST {
 }
 
 /**
- * General position data for diagnostics
+ * General position data for diagnostics and ast
  */
-type Pos = {
+export type Pos = {
     character: number;
     line: number;
 }
@@ -143,6 +142,20 @@ export interface AstNode {
     $container?: AstNode;
     $containerProperty?: string;
     $containerIndex?: number;
+}
+
+/**
+ * Approximation of a langium CST, capturing the most relevant information
+ */
+export interface CstNode {
+    range: {
+        start: Pos;
+        end: Pos;
+    }
+    offset: number;
+    length: number;
+    end: number;
+    text: string;
 }
 
 export interface Reference<T extends AstNode = AstNode> {

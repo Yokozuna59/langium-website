@@ -5,8 +5,8 @@ import {
 import { buildWorkerDefinition } from "monaco-editor-workers";
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { Diagnostic, DocumentChangeResponse, LangiumAST } from "../langium-utils/langium-ast";
-import { defaultText, syntaxHighlighting } from "./arithmetics-tools";
+import { CstNode, Diagnostic, DocumentChangeResponse } from "../langium-utils/langium-ast";
+import { Evaluation, defaultText, syntaxHighlighting } from "./arithmetics-tools";
 
 buildWorkerDefinition(
     "../../libs/monaco-editor-workers/workers",
@@ -17,27 +17,32 @@ addMonacoStyles("monaco-editor-styles");
 
 
 interface PreviewProps {
+    evaluations?: Evaluation[];
     diagnostics?: Diagnostic[];
+    focusLine: (line: number) => void;
+
 }
 class Preview extends React.Component<PreviewProps, PreviewProps> {
     constructor(props: PreviewProps) {
         super(props);
         this.state = {
+            evaluations: props.evaluations,
             diagnostics: props.diagnostics,
+            focusLine: props.focusLine,
         };
 
         this.startPreview = this.startPreview.bind(this);
+        this.setState({ focusLine: this.state.focusLine.bind(this) })
     }
 
-    startPreview(diagnostics: Diagnostic[]) {
-        this.setState({ diagnostics: diagnostics });
+    startPreview(evaluations: Evaluation[], diagnostics: Diagnostic[]) {
+        console.dir(evaluations);
+        this.setState({ evaluations: evaluations, diagnostics: diagnostics });
     }
 
     render() {
-
-        console.log("render preview");
         // check if code contains an astNode
-        if (false) {
+        if (!this.state.evaluations) {
             // Show the exception
             return (
                 <div className="flex flex-col h-full w-full p-4 justify-start items-center my-10">
@@ -48,20 +53,27 @@ class Preview extends React.Component<PreviewProps, PreviewProps> {
             );
         }
 
-        // if the code doesn't contain any errors
-        if (this.state.diagnostics == null || (this.state.diagnostics.length == 0)) {
+        // if the code doesn't contain any errors and the diagnsotics aren't warnings
+        if (this.state.diagnostics == null || this.state.diagnostics.length != 0 && this.state.diagnostics.filter((i) => i.severity === 1).length == 0) {
             return (
-                <div className="flex flex-col h-full w-full p-4 float-right items-center">
-                  
+                <div className="text-white rounded-md p-4 text-left text-sm cursor-default">
+                    {this.state.evaluations.map((evaluation, index) =>
+                        <div key={index} className="pt-4 cursor-pointer" onClick={() => this.state.focusLine(evaluation.range.start.line)}>
+                            <p>
+                                {evaluation.range.start.line == evaluation.range.end.line && <span>{`Line ${evaluation.range.start.line}: `}</span>}
+                                {evaluation.range.start.line != evaluation.range.end.line && <span>{`Line ${evaluation.range.start.line}-${evaluation.range.end.line}: `}</span>}
+                                <span className="text-accentBlue">{evaluation.text}</span> = <span className="text-accentGreen">{evaluation.value}</span>
+                            </p>
+                        </div>
+                    )}
                 </div>
             );
         }
-
         // Show the exception
         return (
             <div className="flex flex-col h-full w-full p-4 justify-start items-center my-10" >
                 <div className="text-white border-2 border-solid border-accentRed rounded-md p-4 text-left text-sm cursor-default">
-                    {this.state.diagnostics.map((diagnostic, index) =>
+                    {this.state.diagnostics.filter((i) => i.severity === 1).map((diagnostic, index) =>
                         <details key={index}>
                             <summary>{`Line ${diagnostic.range.start.line}-${diagnostic.range.end.line}: ${diagnostic.message}`}</summary>
                             <p>Source: {diagnostic.source} | Code: {diagnostic.code}</p>
@@ -105,7 +117,7 @@ class App extends React.Component<{}> {
         if (!lc) {
             throw new Error("Could not get handle to Language Client on mount");
         }
-
+        this.monacoEditor.current.getEditorWrapper()?.getEditor()?.focus();
         // register to receive DocumentChange notifications
         lc.onNotification("browser/DocumentChange", this.onDocumentChange);
     }
@@ -116,8 +128,9 @@ class App extends React.Component<{}> {
      * @param resp Response data
      */
     onDocumentChange(resp: DocumentChangeResponse) {
-        // decode the received Ast
-        this.preview.current?.startPreview(resp.diagnostics);
+        // decode the received Asts
+        let result = JSON.parse(resp.content)
+        this.preview.current?.startPreview(result.evaluations, resp.diagnostics);
     }
 
     render() {
@@ -145,7 +158,11 @@ class App extends React.Component<{}> {
                     </div>
                 </div>
                 <div className="float-right w-1/2 h-full" id="preview">
-                    <Preview ref={this.preview} />
+                    <Preview ref={this.preview} focusLine={(line: number) => {
+                        this.monacoEditor.current?.getEditorWrapper()?.getEditor()?.revealLineInCenter(line);
+                        this.monacoEditor.current?.getEditorWrapper()?.getEditor()?.setPosition({ lineNumber: line, column: 1 });
+                        this.monacoEditor.current?.getEditorWrapper()?.getEditor()?.focus();
+                    }} />
                 </div>
             </div>
         );

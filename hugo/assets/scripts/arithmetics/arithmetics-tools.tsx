@@ -1,5 +1,14 @@
 import { monaco } from "monaco-editor-wrapper/.";
+import { AstNode, Diagnostic, Pos } from "../langium-utils/langium-ast";
 
+export interface Evaluation {
+    range: {
+        start: Pos;
+        end: Pos;
+    }
+    text: string;
+    value: number;
+}
 export const defaultText = `Module example1
 
 Def y: 1 + 3 - 99828932 / 2 + 2 - 1;
@@ -20,14 +29,14 @@ Func(T, Func(T, X)); // 131`;
 
 
 export const syntaxHighlighting = {
+    ignoreCase: true,
     keywords: [
         'def','module'
     ],
     operators: [
         '*','+',',','-','/',':',';'
     ],
-    symbols:  /\(|\)|\*|\+|,|-|\/|:|;/, // fix this regex
-
+    symbols:  /\(|\)|\*|\+|,|-|\/|:|;/,
     tokenizer: {
         initial: [
             { regex: /[_a-zA-Z][\w_]*/, action: { cases: { '@keywords': {"token":"keyword"}, '@default': {"token":"ID"} }} },
